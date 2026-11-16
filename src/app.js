@@ -394,6 +394,15 @@ app.get('/api/accounts/report', need('reports'), (req, res) => {
   res.json({ rows });
 });
 
+app.put('/api/company', need(), wrap(async (req, res) => {
+  if (!req.user.role_fixed) throw fail(403, 'فقط المدير يعدّل بيانات المكتب');
+  const c = setting('company', {}); const b = req.body || {};
+  const out = { ...c };
+  for (const k of ['name', 'nameEn', 'phone', 'email', 'website']) if (typeof b[k] === 'string') out[k] = b[k].trim().slice(0, 120);
+  if (!out.name) throw fail(400, 'اكتب اسم المكتب');
+  setSetting('company', out); audit(req.user.id, 'company', out); res.json({ company: out });
+}));
+
 // ---------- الموظفون ----------
 const shapeUser = u => ({ id: u.id, name: u.name, username: u.username, civilId: u.civil_id, email: u.email, phone: u.phone, roleId: u.role_id, role: u.role_name, active: !!u.active, lastLogin: u.last_login, fixed: !!u.role_fixed });
 app.get('/api/users', need('users_view', 'users_edit', 'password_reset'), (req, res) => res.json({ users: db.prepare('SELECT u.*, r.name role_name, r.fixed role_fixed FROM users u JOIN roles r ON r.id=u.role_id ORDER BY u.id').all().map(shapeUser) }));

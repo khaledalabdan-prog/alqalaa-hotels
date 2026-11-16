@@ -106,8 +106,10 @@ function seed() {
   if (setting('margin') === undefined) setSetting('margin', { type: 'percent', value: 8 });
   if (setting('bonus') === undefined) setSetting('bonus', { type: 'percent_profit', value: 10 });
   if (setting('company') === undefined) setSetting('company', {
-    name: 'سفريات القلعة للسياحة والسفر', nameEn: 'Al Qalaa Travels', phone: '', email: 'booking@alqalaatravels.net', website: 'alqalaatravels.net'
+    name: 'سفريات القلعة للسياحة والسفر', nameEn: 'Al Qalaa Travels', phone: '+965 22204949', email: 'booking@alqalaatravels.net', website: 'alqalaatravels.net'
   });
+  const co = setting('company');
+  if (co && !co.phone) setSetting('company', { ...co, phone: '+965 22204949' });
 }
 seed();
 

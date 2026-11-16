@@ -468,6 +468,13 @@ async function viewAccounts() {
       <div class="tw"><table><thead><tr><th>الموظف</th><th>الصفة</th><th>نوع المكافأة</th><th>القيمة</th><th></th></tr></thead><tbody>
       ${emps.map(u => `<tr data-uid="${u.id}"><td><b>${esc(u.name)}</b></td><td>${esc(u.role)}</td><td>${sel('type', BT, u.bonus_type || 'default', be)}</td><td>${num('value', u.bonus_value, be)}</td><td>${be ? '' : '<button class="btn s" data-sb>حفظ</button>'}</td></tr>`).join('')}</tbody></table></div>
       <p class="muted">النسبة تُحسب من ربح الحجز. الحجز الملغي لا تُحسب عليه مكافأة.</p></section>` : ''}
+    ${S.user.fixed ? `<section class="card"><h2>بيانات المكتب (تظهر في القسيمة)</h2><form class="row" id="co">
+      <label class="f" style="flex:2 1 260px">اسم المكتب<input name="name" value="${esc(S.company.name || '')}" required></label>
+      <label class="f">الاسم بالإنجليزي<input name="nameEn" dir="ltr" value="${esc(S.company.nameEn || '')}"></label>
+      <label class="f">هاتف المكتب<input name="phone" dir="ltr" value="${esc(S.company.phone || '')}"></label>
+      <label class="f">بريد المكتب<input name="email" dir="ltr" value="${esc(S.company.email || '')}"></label>
+      <label class="f">الموقع<input name="website" dir="ltr" value="${esc(S.company.website || '')}"></label>
+      <button class="btn p">حفظ</button></form></section>` : ''}
     ${can('reports') ? `<section class="card"><div class="row" style="justify-content:space-between;margin-bottom:12px"><h2>تقرير المحاسب</h2><form class="row" id="rf"><input type="date" name="from" value="${from}" style="height:40px;border:1px solid var(--bd2);border-radius:10px;padding:0 10px"><span style="align-self:center">إلى</span><input type="date" name="to" value="${to}" style="height:40px;border:1px solid var(--bd2);border-radius:10px;padding:0 10px"><button class="btn s p" style="height:40px">عرض</button><a class="btn s" style="height:40px" id="csv">تصدير Excel</a></form></div><div id="rep"></div></section>` : ''}`);
   main.onsubmit = async e => {
     e.preventDefault(); const f = e.target;
@@ -476,6 +483,7 @@ async function viewAccounts() {
       if (f.id === 'fx') { await api('/api/accounts/fx', { method: 'PUT', body: Object.fromEntries(new FormData(f)) }); toast('تم حفظ أسعار الصرف'); }
       if (f.id === 'bd') { await api('/api/accounts/bonus', { method: 'PUT', body: Object.fromEntries(new FormData(f)) }); toast('تم حفظ المكافأة العامة'); }
       if (f.id === 'rf') { S.repFrom = f.from.value; S.repTo = f.to.value; loadRep(); }
+      if (f.id === 'co') { const d = await api('/api/company', { method: 'PUT', body: Object.fromEntries(new FormData(f)) }); S.company = d.company; toast('تم حفظ بيانات المكتب'); }
     } catch (er) { toast(er.message); }
   };
   main.onclick = async e => {
