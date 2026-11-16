@@ -109,7 +109,7 @@ app.get('/api/meta', need(), (req, res) => {
 
 // ---------- البحث (يدمج نتائج كل الشركات المفعّلة) ----------
 function cleanQuery(b) {
-  const q = { city: String(b.city || '').trim(), checkin: b.checkin, checkout: b.checkout, residence: (b.residence || 'KW').toUpperCase().slice(0, 2), nationality: b.nationality || 'كويتي', lang: 'en' };
+  const q = { city: String(b.city || '').trim(), cityEn: String(b.cityEn || '').trim(), cityCode: String(b.cityCode || '').trim().toUpperCase().slice(0, 3), checkin: b.checkin, checkout: b.checkout, residence: (b.residence || 'KW').toUpperCase().slice(0, 2), nationality: b.nationality || 'كويتي', lang: 'en' };
   q.rooms = (Array.isArray(b.rooms) && b.rooms.length ? b.rooms : [{ adults: 2, children: [] }]).slice(0, 5)
     .map(r => ({ adults: Math.min(6, Math.max(1, +r.adults || 1)), children: (r.children || []).slice(0, 4).map(a => Math.min(17, Math.max(0, +a || 0))) }));
   if (!q.city) throw fail(400, 'اختر الوجهة');

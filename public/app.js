@@ -117,20 +117,57 @@ function viewPassword() {
 
 // ---------- البحث والنتائج ----------
 const steps = n => `<ol class="steps" aria-label="خطوات الحجز">${['اختيار الفندق والغرفة', 'بيانات النزلاء', 'التأكيد والقسيمة'].map((t, i) => `${i ? '<i aria-hidden="true"></i>' : ''}<li class="${i + 1 === n ? 'on' : ''}"><span>${i + 1}</span>${t}</li>`).join('')}</ol>`;
-function viewSearch() {
-  const q = S.search || { city: S.meta.cities[0] || '', checkin: addDays(14), checkout: addDays(17), rooms: [{ adults: 2, children: [] }], nationality: 'كويتي', residence: 'KW' };
+const NATS = [['KW', 'كويتي'], ['SA', 'سعودي'], ['AE', 'إماراتي'], ['QA', 'قطري'], ['BH', 'بحريني'], ['OM', 'عماني'], ['YE', 'يمني'], ['IQ', 'عراقي'], ['JO', 'أردني'], ['SY', 'سوري'], ['LB', 'لبناني'], ['PS', 'فلسطيني'], ['EG', 'مصري'], ['SD', 'سوداني'], ['LY', 'ليبي'], ['TN', 'تونسي'], ['DZ', 'جزائري'], ['MA', 'مغربي'], ['MR', 'موريتاني'], ['SO', 'صومالي'], ['DJ', 'جيبوتي'], ['KM', 'قمري']];
+const normAr = s => String(s || '').toLowerCase().replace(/[\u064B-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').trim();
+async function loadCities() {
+  if (S.cities) return S.cities;
+  const d = await fetch('/cities.json').then(r => r.json());
+  S.cities = d.cities.map(([code, ar, en, cAr, cEn, alt]) => ({ code, ar, en, cAr, cEn, alt, key: normAr([ar, en, code, cAr, cEn, ...(alt || [])].join(' ')) }));
+  return S.cities;
+}
+const cityLabel = c => `${c.ar || c.en}${c.code ? ` (${c.code})` : ''}${c.ar ? ' · ' + c.en : ''}${c.cAr ? ' — ' + c.cAr : ''}`;
+function findCities(term) {
+  const t = normAr(term); if (!t) return [];
+  const exact = [], starts = [], has = [];
+  for (const c of S.cities) {
+    if (c.code.toLowerCase() === t || (c.alt || []).some(a => a.toLowerCase() === t)) exact.push(c);
+    else if (normAr(c.ar).startsWith(t) || c.en.toLowerCase().startsWith(t)) starts.push(c);
+    else if (c.key.includes(t)) has.push(c);
+    if (exact.length + starts.length > 40) break;
+  }
+  return [...exact, ...starts, ...has].slice(0, 12);
+}
+async function viewSearch() {
+  await loadCities();
+  const q = S.search || { city: 'مكة المكرمة', cityEn: 'Makkah', cityCode: '', checkin: addDays(14), checkout: addDays(17), rooms: [{ adults: 2, children: [] }], nationality: 'كويتي', residence: 'KW' };
+  if (!S.cityObj) S.cityObj = S.cities.find(c => c.ar === q.city || c.en === q.cityEn) || null;
   const main = shell('search', `${steps(1)}
     <div class="head"><div><h1>البحث عن فندق</h1><p class="sub">ابحث في كل الشركات المورّدة دفعة واحدة. السعر المعروض هو سعر البيع النهائي، واسم الشركة لا يظهر إلا بعد تأكيد الحجز.</p></div></div>
-    <form class="card" id="sf"><div class="row">
-      <label class="f" style="flex:2 1 220px">الوجهة<input name="city" list="cities" value="${esc(q.city)}" required><datalist id="cities">${S.meta.cities.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
+    <form class="card" id="sf" autocomplete="off"><div class="row">
+      <label class="f" style="flex:2 1 280px;position:relative">الوجهة (المدينة أو رمز المطار)<input name="city" id="cityIn" value="${esc(S.cityObj ? cityLabel(S.cityObj) : '')}" placeholder="مثال: القاهرة أو Cairo أو CAI" required role="combobox" aria-expanded="false" aria-controls="cityList">
+        <ul id="cityList" role="listbox" style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:#fff;border:1px solid var(--bd2);border-radius:12px;margin:4px 0 0;padding:6px;list-style:none;max-height:340px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)"></ul></label>
       <label class="f">تاريخ الدخول<input name="checkin" type="date" value="${q.checkin}" min="${addDays(0)}" required></label>
       <label class="f">تاريخ الخروج<input name="checkout" type="date" value="${q.checkout}" required></label>
       <label class="f">الغرف<select name="rooms">${[1, 2, 3, 4, 5].map(n => `<option ${q.rooms.length === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-      <label class="f">جنسية النزلاء<select name="nat">${[['كويتي', 'KW'], ['سعودي', 'SA'], ['إماراتي', 'AE'], ['قطري', 'QA'], ['بحريني', 'BH'], ['عماني', 'OM'], ['مصري', 'EG'], ['أخرى', 'KW']].map(([t, c]) => `<option value="${c}|${t}" ${q.nationality === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label class="f">جنسية النزلاء<select name="nat">${NATS.map(([c, t]) => `<option value="${c}|${t}" ${q.nationality === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <button class="btn p" style="flex:0 0 auto">بحث</button></div>
       <div id="paxes" class="row" style="margin-top:12px"></div>
       <p class="muted" style="margin:10px 0 0">الجنسية تُثبّت من البحث حتى الحجز، لأن تغييرها قد يغيّر السعر أو يُفشل الحجز.</p></form>
     <div id="res"></div>`);
+  const cin = main.querySelector('#cityIn'), cl = main.querySelector('#cityList');
+  let matches = [];
+  const drawList = () => {
+    matches = findCities(cin.value);
+    cl.innerHTML = matches.map((c, i) => `<li role="option" data-i="${i}" style="padding:10px 12px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:10px"><span><b>${esc(c.ar || c.en)}</b> <span class="muted">${c.ar ? esc(c.en) + ' — ' : ''}${esc(c.cAr || c.cEn)}</span></span>${c.code ? `<b dir="ltr" style="color:var(--ac)">${esc(c.code)}</b>` : ''}</li>`).join('') || '<li class="muted" style="padding:10px">لا توجد مدينة بهذا الاسم</li>';
+    cl.style.display = cin.value.trim() ? 'block' : 'none'; cin.setAttribute('aria-expanded', cl.style.display === 'block');
+  };
+  const pick = c => { S.cityObj = c; cin.value = cityLabel(c); cl.style.display = 'none'; };
+  cin.oninput = () => { S.cityObj = null; drawList(); };
+  cin.onfocus = () => { if (!S.cityObj && cin.value) drawList(); else cin.select(); };
+  cin.onkeydown = e => { if (e.key === 'Enter' && cl.style.display === 'block' && matches[0]) { e.preventDefault(); pick(matches[0]); } if (e.key === 'Escape') cl.style.display = 'none'; };
+  cl.onmousedown = e => { const li = e.target.closest('[data-i]'); if (li) { e.preventDefault(); pick(matches[+li.dataset.i]); } };
+  cl.onmouseover = e => { cl.querySelectorAll('li').forEach(l => l.style.background = ''); const li = e.target.closest('[data-i]'); if (li) li.style.background = 'var(--acbg)'; };
+  cin.onblur = () => setTimeout(() => { cl.style.display = 'none'; }, 150);
   const f = main.querySelector('#sf');
   let rooms = JSON.parse(JSON.stringify(q.rooms));
   const drawPax = () => {
@@ -152,7 +189,9 @@ function viewSearch() {
   f.onsubmit = async e => {
     e.preventDefault();
     const [res, nat] = f.nat.value.split('|');
-    S.search = { city: f.city.value.trim(), checkin: f.checkin.value, checkout: f.checkout.value, rooms, residence: res, nationality: nat };
+    if (!S.cityObj) { const m = findCities(f.city.value)[0]; if (!m) return toast('اختر الوجهة من القائمة'); S.cityObj = m; f.city.value = cityLabel(m); }
+    const c = S.cityObj;
+    S.search = { city: c.ar || c.en, cityEn: c.en, cityCode: c.code, checkin: f.checkin.value, checkout: f.checkout.value, rooms, residence: res, nationality: nat };
     const out = main.querySelector('#res'); out.innerHTML = '<div class="card muted">جارٍ البحث في كل الشركات المفعّلة...</div>';
     try { S.results = await api('/api/search', { body: S.search }); drawResults(main); }
     catch (er) { out.innerHTML = `<div class="err">${esc(er.message)}</div>`; }
@@ -183,7 +222,7 @@ function drawResults(main) {
       <div class="rooms"><div class="row" style="justify-content:space-between"><b>الغرف المتاحة</b><span class="muted">أفضل الأسعار من كل المزوّدين · ${h.options.length} خيار</span></div>
       ${h.options.map(o => `<div class="opt"><div class="l"><div><b style="font-size:17px">${esc(o.roomName)}</b><div class="muted" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px"><span>${esc(o.board)}</span><span>السعر لكل الغرف</span></div></div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="price">${(+o.sell).toFixed(3)} <small>KWD</small></span><span class="muted">للإقامة كاملة، ${R.nights} ليالٍ · شامل الضرائب</span>${can('book') ? `<button class="btn p s" style="height:40px;padding:0 22px" data-pick="${o.token}">اختر</button>` : ''}</div></div>
-        <div class="canc ${o.refundable ? 'ok' : 'bad'}">${esc(o.cancelPolicy)}</div></div>`).join('')}</div></article>`).join('') : '<div class="empty">لا توجد نتائج مطابقة. غيّر الفلاتر أو التواريخ.</div>'}</div>`;
+        <div class="canc ${o.refundable ? 'ok' : 'bad'}">${esc(o.cancelPolicy)}</div></div>`).join('')}</div></article>`).join('') : (R.hotels.length ? '<div class="empty">لا توجد نتائج مطابقة للفلاتر. غيّر الفلاتر.</div>' : '<div class="empty">لا توجد فنادق متاحة لهذه الوجهة والتواريخ لدى الشركات المفعّلة حالياً.</div>')}</div>`;
   const tog = (arr, v) => arr.includes(v) ? arr.splice(arr.indexOf(v), 1) : arr.push(v);
   out.onclick = async e => {
     const t = e.target.closest('button'); if (!t) return;

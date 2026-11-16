@@ -91,7 +91,7 @@ module.exports = function juniperSupplier(sup) {
       return { count: total };
     },
     async search(q) {
-      const codes = db.prepare('SELECT code FROM supplier_hotels WHERE supplier_id=? AND city=? LIMIT 500').all(sup.id, q.city).map(r => r.code);
+      const codes = db.prepare('SELECT code FROM supplier_hotels WHERE supplier_id=? AND (city=? COLLATE NOCASE OR city=? COLLATE NOCASE) LIMIT 500').all(sup.id, q.city, q.cityEn || q.city).map(r => r.code);
       if (!codes.length) return [];
       const { paxes, dist } = paxXml(q.rooms);
       const { rs } = await call('webservice/JP/Operations/AvailTransactions.asmx', 'HotelAvail',
