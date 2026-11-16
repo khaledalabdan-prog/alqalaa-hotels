@@ -91,7 +91,7 @@ function seed() {
   }
   if (db.prepare('SELECT COUNT(*) c FROM users').get().c === 0) {
     const mgr = db.prepare("SELECT id FROM roles WHERE fixed=1").get();
-    const pass = process.env.ADMIN_PASSWORD || 'Admin@12345';
+    const pass = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? require('crypto').randomBytes(9).toString('base64') : 'Admin@12345');
     db.prepare(`INSERT INTO users(name,username,civil_id,email,phone,role_id,pass_hash,must_change)
       VALUES(?,?,?,?,?,?,?,1)`).run(
       process.env.ADMIN_NAME || 'المدير', process.env.ADMIN_USERNAME || 'admin',

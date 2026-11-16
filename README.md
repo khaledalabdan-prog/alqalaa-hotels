@@ -15,7 +15,7 @@
 npm install
 npm start
 ```
-ثم افتح http://localhost:3000. الدخول الأول: `admin` / `Admin@12345` (يُطلب تغييره فوراً).
+ثم افتح http://localhost:3000. الدخول الأول بالقيم `ADMIN_USERNAME` و`ADMIN_PASSWORD` (يُطلب تغيير الرقم السري فوراً).
 
 ## الرفع على Render (عبر GitHub)
 1. ارفع المجلد على مستودع جديد في GitHub (مثلاً `alqalaa-hotels`).

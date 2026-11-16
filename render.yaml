@@ -3,7 +3,8 @@ services:
     name: alqalaa-hotels
     runtime: node
     plan: starter
-    buildCommand: npm install
+    region: frankfurt
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
@@ -11,6 +12,14 @@ services:
       - key: DB_PATH
         value: /var/data/hotels.db
       - key: APP_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: khaled
+      - key: ADMIN_NAME
+        value: خالد العبدان
+      - key: ADMIN_EMAIL
+        value: khaled.alabdan@gmail.com
+      - key: ADMIN_PASSWORD
         generateValue: true
     disk:
       name: hotels-data
