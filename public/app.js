@@ -1,5 +1,6 @@
 // واجهة نظام حجز الفنادق — سفريات القلعة للسياحة والسفر
 'use strict';
+try { if (localStorage.getItem('qh_theme') === 'dark') document.documentElement.classList.add('dark'); } catch (e) { }
 const $app = document.getElementById('app');
 const S = { user: null, company: {}, meta: null, search: null, results: null, filters: { stars: [], boards: [], refundable: false, min: '', max: '', sort: 'price' }, rules: null, timer: null, bk: { q: '', status: '', from: '', to: '', dateType: 'created', user: '', city: '', page: 1 }, openBooking: null };
 
@@ -50,8 +51,9 @@ function shell(active, inner) {
   $app.innerHTML = `<header class="topbar">
     <div class="brand"><img src="/logo.jpg" alt="شعار سفريات القلعة"><div><b>${esc(S.company.name || 'سفريات القلعة للسياحة والسفر')}</b><small>نظام حجز الفنادق</small></div></div>
     <nav class="nav" aria-label="القائمة الرئيسية">${links}</nav>
-    <div class="who"><div><b>${esc(S.user.name)}</b><small>${esc(S.user.role)}</small></div><a href="#password" class="btn s g">الرقم السري</a><button class="btn s g" id="logout">خروج</button></div>
+    <div class="who"><div><b>${esc(S.user.name)}</b><small>${esc(S.user.role)}</small></div><button class="btn s g theme" id="theme" aria-label="تبديل الوضع الداكن" title="الوضع الداكن / الفاتح">${document.documentElement.classList.contains('dark') ? '☀' : '☾'}</button><a href="#password" class="btn s g">الرقم السري</a><button class="btn s g" id="logout">خروج</button></div>
   </header><main>${inner}</main>`;
+  $app.querySelector('#theme').onclick = () => { const d = document.documentElement.classList.toggle('dark'); try { localStorage.setItem('qh_theme', d ? 'dark' : 'light'); } catch (e) { } $app.querySelector('#theme').textContent = d ? '☀' : '☾'; };
   $app.querySelector('#logout').onclick = async () => { await api('/api/logout', { method: 'POST' }); S.user = null; go('login'); };
   return $app.querySelector('main');
 }
@@ -145,7 +147,7 @@ async function viewSearch() {
     <div class="head"><div><h1>البحث عن فندق</h1><p class="sub">ابحث في كل الشركات المورّدة دفعة واحدة. السعر المعروض هو سعر البيع النهائي، واسم الشركة لا يظهر إلا بعد تأكيد الحجز.</p></div></div>
     <form class="card" id="sf" autocomplete="off"><div class="row">
       <label class="f" style="flex:2 1 280px;position:relative">الوجهة (المدينة أو رمز المطار)<input name="city" id="cityIn" value="${esc(S.cityObj ? cityLabel(S.cityObj) : '')}" placeholder="مثال: القاهرة أو Cairo أو CAI" required role="combobox" aria-expanded="false" aria-controls="cityList">
-        <ul id="cityList" role="listbox" style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:#fff;border:1px solid var(--bd2);border-radius:12px;margin:4px 0 0;padding:6px;list-style:none;max-height:340px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)"></ul></label>
+        <ul id="cityList" role="listbox" style="display:none;position:absolute;top:100%;right:0;left:0;z-index:20;background:var(--card);border:1px solid var(--bd2);border-radius:12px;margin:4px 0 0;padding:6px;list-style:none;max-height:340px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)"></ul></label>
       <label class="f">تاريخ الدخول<input name="checkin" type="date" value="${q.checkin}" min="${addDays(0)}" required></label>
       <label class="f">تاريخ الخروج<input name="checkout" type="date" value="${q.checkout}" required></label>
       <label class="f">الغرف<select name="rooms">${[1, 2, 3, 4, 5].map(n => `<option ${q.rooms.length === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
