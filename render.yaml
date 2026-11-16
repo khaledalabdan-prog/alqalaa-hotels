@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: alqalaa-hotels
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DB_PATH
+        value: /var/data/hotels.db
+      - key: APP_SECRET
+        generateValue: true
+    disk:
+      name: hotels-data
+      mountPath: /var/data
+      sizeGB: 1

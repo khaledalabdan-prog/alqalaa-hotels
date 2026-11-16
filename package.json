@@ -1,0 +1,20 @@
+{
+  "name": "alqalaa-hotels",
+  "version": "1.0.0",
+  "description": "نظام حجز الفنادق لموظفي سفريات القلعة للسياحة والسفر",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.2.0",
+    "express": "^5.3.0",
+    "fast-xml-parser": "^5.12.1",
+    "nodemailer": "^10.6.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
