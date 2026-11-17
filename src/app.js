@@ -215,10 +215,11 @@ async function doBook(body, ctx) {
   const nights = nightsBetween(q.checkin, q.checkout);
   const ins = db.prepare(`INSERT INTO bookings(ref,user_id,source,api_key_id,supplier_id,supplier_name,status,hotel_code,hotel_name,hotel_stars,hotel_address,hotel_city,hotel_phone,
     checkin,checkout,nights,checkin_time,checkout_time,room_name,board,rooms_json,guests_json,nationality,cancel_policy,refundable,customer_name,customer_phone,customer_email,notes,collection,
-    cost,margin,sell,margin_desc,bonus,bonus_desc) VALUES(?,?,?,?,?,?,'processing',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    cost,margin,sell,margin_desc,bonus,bonus_desc,free_cancel_until,query_json,residence) VALUES(?,?,?,?,?,?,'processing',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     ref, user?.id || null, ctx.apiKeyId ? 'website' : 'staff', ctx.apiKeyId || null, sup.id, sup.name, data.hotelCode, r.hotel?.name, r.hotel?.stars, r.hotel?.address, r.hotel?.city || q.city, r.hotel?.phone || '',
     q.checkin, q.checkout, nights, r.hotel?.checkinTime || '', r.hotel?.checkoutTime || '', r.roomName, r.board, JSON.stringify(q.rooms), JSON.stringify(clean), q.nationality, r.cancelPolicy, r.refundable ? 1 : 0,
-    customer.name, customer.phone, customer.email, String(body.notes || '').slice(0, 500), String(body.collection || ''), p.cost, p.margin, p.sell, p.marginDesc, bonus.bonus, bonus.desc);
+    customer.name, customer.phone, customer.email, String(body.notes || '').slice(0, 500), String(body.collection || ''), p.cost, p.margin, p.sell, p.marginDesc, bonus.bonus, bonus.desc,
+    r.refundable ? (r.freeCancelUntil || null) : null, JSON.stringify(q), q.residence || 'KW');
   const id = ins.lastInsertRowid;
   db.prepare('DELETE FROM quotes WHERE token=?').run(row.token);
   let result;
@@ -248,7 +249,7 @@ function shapeBooking(b, u, opts = {}) {
   const done = ['confirmed', 'pending', 'cancelled'].includes(b.status);
   if (opts.api) return out;
   if (can(u, 'supplier_view') && done) Object.assign(out, { supplier: b.supplier_name, locator: b.supplier_locator, supplierStatus: b.supplier_status });
-  if (can(u, 'accounts_view')) Object.assign(out, { supplier: b.supplier_name, locator: b.supplier_locator, supplierStatus: b.supplier_status, cost: b.cost, margin: b.margin, marginDesc: b.margin_desc, bonus: b.bonus, bonusDesc: b.bonus_desc, net: r3(b.margin - b.bonus) });
+  if (can(u, 'accounts_view')) Object.assign(out, { supplier: b.supplier_name, locator: b.supplier_locator, supplierStatus: b.supplier_status, cost: b.cost, margin: b.margin, marginDesc: b.margin_desc, bonus: b.bonus, bonusDesc: b.bonus_desc, net: r3(b.margin - b.bonus), savings: b.savings || 0, rebooks: b.rebooks || 0 });
   return out;
 }
 app.post('/api/book', need('book'), wrap(async (req, res) => res.json({ booking: shapeBooking(await doBook(req.body || {}, { userId: req.user.id }), req.user) })));
@@ -519,6 +520,8 @@ v1.post('/bookings/:ref/cancel', wrap(async (req, res) => {
   res.json({ booking: shapeBooking(await supplierAction(b, 'cancel', null), null, { api: true }) });
 }));
 app.use('/api/v1', v1);
+
+require('./hunter')(app, { need, wrap, fail, can, searchAll: (...a) => searchAll(...a), shapeBooking: (...a) => shapeBooking(...a) });
 
 // ---------- الواجهة ----------
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html', maxAge: '1h' }));

@@ -72,6 +72,19 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 `);
 
+// إضافات صيّاد الأسعار على الجداول القديمة
+const bcols = db.prepare('PRAGMA table_info(bookings)').all().map(c => c.name);
+for (const [c, t] of [['free_cancel_until', 'TEXT'], ['query_json', 'TEXT'], ['residence', 'TEXT'], ['last_watch', 'TEXT'], ['savings', 'REAL DEFAULT 0'], ['rebooks', 'INTEGER DEFAULT 0']])
+  if (!bcols.includes(c)) db.exec(`ALTER TABLE bookings ADD COLUMN ${c} ${t}`);
+db.exec(`CREATE TABLE IF NOT EXISTS price_opps (
+  id INTEGER PRIMARY KEY, booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  found_at TEXT DEFAULT (datetime('now')), supplier_id INTEGER, supplier_name TEXT, option_json TEXT,
+  room_name TEXT, board TEXT, old_cost REAL, new_cost REAL, saving REAL, new_free_cancel TEXT, new_cancel_policy TEXT,
+  status TEXT DEFAULT 'open', handled_by INTEGER, handled_at TEXT, note TEXT,
+  old_supplier TEXT, old_locator TEXT, new_locator TEXT, notified INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ix_opps ON price_opps(status, booking_id);`);
+
 function setting(key, def) {
   const r = db.prepare('SELECT value FROM settings WHERE key=?').get(key);
   return r ? JSON.parse(r.value) : def;
@@ -104,6 +117,7 @@ function seed() {
     db.prepare("INSERT INTO suppliers(name,type,env,active) VALUES('مورّد تجريبي ب','mock','test',1)").run();
   }
   if (setting('margin') === undefined) setSetting('margin', { type: 'percent', value: 8 });
+  if (setting('watch') === undefined) setSetting('watch', { enabled: true, intervalHours: 6, minSaving: 5 });
   if (setting('bonus') === undefined) setSetting('bonus', { type: 'percent_profit', value: 10 });
   if (setting('company') === undefined) setSetting('company', {
     name: 'سفريات القلعة للسياحة والسفر', nameEn: 'Al Qalaa Travels', phone: '+965 22204949', email: 'booking@alqalaatravels.net', website: 'alqalaatravels.net'

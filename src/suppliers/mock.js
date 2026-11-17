@@ -54,12 +54,14 @@ module.exports = function mockSupplier(sup) {
         ROOMS.forEach(([room, board, f], i) => {
           if (h(seed + code + i + q.checkin) % 4 === 0) return;
           const refundable = h(code + i) % 3 !== 0;
-          const perNight = base * f * (1 + (h(seed + code + room) % 13) / 100) * (1 + (pax - 2) * 0.12);
+          const slot = Math.floor(Date.now() / (6 * 3600e3)); // الأسعار التجريبية تتغير كل 6 ساعات لتجربة صيّاد الأسعار
+          const perNight = base * f * (1 + (h(seed + code + room) % 13) / 100 - (h(seed + code + room + slot) % 10) / 100) * (1 + (pax - 2) * 0.12);
           const cost = Math.round(perNight * nights * q.rooms.length * 1000) / 1000;
-          const deadline = addDays(q.checkin, -(5 + (h(code + i) % 4))).split('-').reverse().join('/');
+          const dl = addDays(q.checkin, -(5 + (h(code + i) % 4)));
+          const deadline = dl.split('-').reverse().join('/');
           options.push({
             optionId: `${sup.id}|${code}|${i}|${q.checkin}|${q.checkout}`,
-            roomName: room, board, refundable, cost, currency: 'KWD',
+            roomName: room, board, refundable, cost, currency: 'KWD', freeCancelUntil: refundable ? dl + 'T00:00:00' : null,
             cancelPolicy: refundable ? `إلغاء مجاني قبل ${deadline}، بعدها تُخصم قيمة ليلة واحدة.` : 'غير قابل للاسترداد: لا يُسترد المبلغ عند الإلغاء.',
           });
         });
@@ -76,7 +78,7 @@ module.exports = function mockSupplier(sup) {
       if (!opt) throw new Error('الغرفة لم تعد متاحة');
       return {
         bookingCode: 'MOCK-' + crypto.randomBytes(6).toString('hex'),
-        cost: opt.cost, currency: 'KWD', refundable: opt.refundable, cancelPolicy: opt.cancelPolicy,
+        cost: opt.cost, currency: 'KWD', refundable: opt.refundable, cancelPolicy: opt.cancelPolicy, freeCancelUntil: opt.freeCancelUntil,
         roomName: opt.roomName, board: opt.board,
         hotel: { name: hotel.hotelName, stars: hotel.stars, address: hotel.area + '، ' + hotel.city, city: hotel.city,
           phone: '', checkinTime: hotel.checkinTime, checkoutTime: hotel.checkoutTime,

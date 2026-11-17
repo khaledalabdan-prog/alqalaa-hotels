@@ -40,6 +40,7 @@ const NAV = [
   ['search', 'البحث والحجز', () => can('search')],
   ['bookings', 'الحجوزات والقسائم', () => can('bookings_own') || can('bookings_all')],
   ['suppliers', 'الشركات الموردة و API', () => can('suppliers_view') || can('api_keys')],
+  ['hunter', 'فرص التوفير', () => can('rebook')],
   ['accounts', 'الحسابات', () => can('accounts_view') || can('reports') || can('bonus_edit')],
   ['employees', 'الموظفون', () => can('users_view') || can('users_edit') || can('password_reset')],
   ['permissions', 'الصلاحيات', () => can('roles_edit')],
@@ -64,7 +65,7 @@ async function route() {
   if (r === 'forgot') return viewForgot();
   if (S.user.mustChange || r === 'password') return viewPassword();
   if (!S.meta) S.meta = await api('/api/meta');
-  const views = { search: viewSearch, booking: viewBooking, bookings: viewBookings, suppliers: viewSuppliers, accounts: viewAccounts, employees: viewEmployees, permissions: viewPermissions };
+  const views = { hunter: viewHunter, search: viewSearch, booking: viewBooking, bookings: viewBookings, suppliers: viewSuppliers, accounts: viewAccounts, employees: viewEmployees, permissions: viewPermissions };
   const allowed = NAV.find(n => n[0] === r);
   if (!views[r] || (allowed && !allowed[2]())) { const first = NAV.find(n => n[2]()); return first ? go(first[0]) : shell('', '<div class="card">لا توجد صلاحيات لحسابك. راجع المدير.</div>'); }
   try { await views[r](); } catch (e) { console.error(e); }
@@ -362,7 +363,7 @@ async function showDetail(main, scroll = true) {
       ${b.supplier ? `<article class="card"><div class="vhead"><img src="/logo.jpg" alt=""><div><span class="muted">بيانات الحجز لدى الشركة</span><h3>${b.cost != null ? 'تفاصيل داخلية' : 'تظهر بعد تأكيد الحجز'}</h3></div></div>
         ${kv('الشركة المورّدة', esc(b.supplier))}${kv('رقم حجز الشركة (Locator)', esc(b.locator || '—'))}${kv('حالة الحجز لدى الشركة', pill(b.status) + (b.supplierStatus ? ` <span class="muted">${esc(b.supplierStatus)}</span>` : ''))}
         ${kv('سعر البيع للعميل', money(b.sell))}${kv('الموظف', esc(b.employee))}${kv('طريقة التحصيل', esc(b.collection || '—'))}
-        ${b.cost != null ? `<div style="margin-top:10px;padding-top:6px;border-top:2px solid var(--tx)"><span class="pill warn">للمحاسب والمدير</span>${kv('سعر التكلفة', money(b.cost))}${kv(`هامش الربح (${esc(b.marginDesc)})`, money(b.margin))}${kv(`مكافأة الموظف (${esc(b.bonusDesc)})`, money(b.bonus))}${kv('صافي ربح الشركة', money(b.net))}</div>` : '<p class="muted" style="margin:10px 0 0">سعر التكلفة وهامش الربح لا يظهران هنا.</p>'}
+        ${b.cost != null ? `<div style="margin-top:10px;padding-top:6px;border-top:2px solid var(--tx)"><span class="pill warn">للمحاسب والمدير</span>${kv('سعر التكلفة', money(b.cost))}${kv(`هامش الربح (${esc(b.marginDesc)})`, money(b.margin))}${kv(`مكافأة الموظف (${esc(b.bonusDesc)})`, money(b.bonus))}${kv('صافي ربح الشركة', money(b.net))}${b.savings ? kv(`وفّره صيّاد الأسعار (${b.rebooks} إعادة حجز)`, `<span style="color:var(--ok)">${money(b.savings)}</span>`) : ''}</div>` : '<p class="muted" style="margin:10px 0 0">سعر التكلفة وهامش الربح لا يظهران هنا.</p>'}
       </article>` : ''}
     </div></section>`;
   if (scroll) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -445,6 +446,60 @@ POST /api/v1/bookings/:ref/cancel</pre><p class="muted">الموقع يرى سع
           (m) => { m.querySelector('#cp').onclick = () => navigator.clipboard.writeText(r.key).then(() => toast('تم النسخ')); });
         viewSuppliers(); }
     } catch (er) { toast(er.message); busy(t, false); }
+  };
+}
+
+// ---------- صيّاد الأسعار ----------
+async function viewHunter() {
+  const d = await api('/api/hunter');
+  const st = d.settings || {};
+  const dt = s => s ? shortDate(String(s).slice(0, 10)) : '—';
+  const main = shell('hunter', `<div class="head"><div><h1>فرص التوفير · صيّاد الأسعار</h1><p class="sub">يراقب الحجوزات القابلة للإلغاء المجاني، ويبحث عن نفس الغرفة بتكلفة أرخص عند كل الشركات. العميل يدفع نفس السعر، والفرق ربح للمكتب.</p></div><button class="btn p" id="run">افحص الآن</button></div>
+    <div class="tiles">
+      <div class="tile"><small>وفّر هذا الشهر</small><b style="font-size:24px;color:var(--ok)">${money(d.month.saving)}</b><small>${d.month.n} إعادة حجز</small></div>
+      <div class="tile"><small>إجمالي التوفير</small><b style="font-size:24px">${money(d.total.saving)}</b><small>${d.total.n} إعادة حجز</small></div>
+      <div class="tile"><small>فرص مفتوحة الآن</small><b style="font-size:24px">${d.opps.length}</b><small>${money(d.opps.reduce((a, o) => a + o.saving, 0))} توفير محتمل</small></div>
+      <div class="tile"><small>حجوزات تحت المراقبة</small><b style="font-size:24px">${d.watched.length}</b><small>آخر فحص: ${d.last ? esc(new Date(d.last.at).toLocaleString('ar-KW')) : 'لم يتم بعد'}</small></div>
+    </div>
+    <section class="card"><h2>الفرص المفتوحة</h2>
+      ${d.opps.length ? `<div class="tw"><table><thead><tr><th>رقم الحجز</th><th>العميل</th><th>الفندق</th><th>الدخول</th><th>الغرفة</th><th>التكلفة الحالية</th><th>التكلفة الجديدة</th><th>التوفير</th><th>الشركة الجديدة</th><th>الإلغاء المجاني الحالي حتى</th><th></th></tr></thead><tbody>
+      ${d.opps.map(o => `<tr><td><b>${esc(o.ref)}</b></td><td>${esc(o.customer_name)}</td><td>${esc(o.hotel_name)}</td><td>${shortDate(o.checkin)}</td><td>${esc(o.room_name)} · ${esc(o.board)}</td><td>${money(o.old_cost)}</td><td>${money(o.new_cost)}</td><td><b style="color:var(--ok)">${money(o.saving)}</b></td><td>${esc(o.supplier_name)}</td><td>${dt(o.free_cancel_until)}</td>
+        <td><button class="btn s p" data-rb="${o.id}">أعد الحجز</button> <button class="btn s g" data-ds="${o.id}">تجاهل</button></td></tr>${o.note ? `<tr><td colspan="11" class="muted" style="white-space:normal">${esc(o.note)}</td></tr>` : ''}`).join('')}</tbody></table></div>`
+      : '<div class="empty">لا توجد فرص توفير الآن. الصياد يفحص تلقائياً، أو اضغط «افحص الآن».</div>'}</section>
+    <section class="card"><h2>الإعدادات</h2><form class="row" id="hs">
+      <label class="f" style="flex:0 1 200px">الحالة<select name="enabled"><option value="1" ${st.enabled ? 'selected' : ''}>يعمل تلقائياً</option><option value="" ${st.enabled ? '' : 'selected'}>موقوف</option></select></label>
+      <label class="f" style="flex:0 1 200px">يفحص كل (ساعات)<input name="intervalHours" type="number" min="1" max="48" value="${st.intervalHours || 6}"></label>
+      <label class="f" style="flex:0 1 220px">أقل توفير يستحق التنبيه (د.ك)<input name="minSaving" type="number" min="0" step="0.5" value="${st.minSaving ?? 5}"></label>
+      <button class="btn p">حفظ</button></form>
+      <p class="muted">يراقب فقط الحجوزات المؤكدة القابلة للإلغاء المجاني، ويتوقف قبل نهاية الإلغاء المجاني بـ 12 ساعة. الغرفة الجديدة لازم تكون نفس الفندق ونفس الغرفة والوجبات، وقابلة للإلغاء المجاني بعد. عند وجود فرصة جديدة يصل بريد للمدير ولمن لديه الصلاحية.</p></section>
+    <section class="card"><h2>تحت المراقبة</h2>${d.watched.length ? `<div class="tw"><table><thead><tr><th>رقم الحجز</th><th>الفندق</th><th>المدينة</th><th>الدخول</th><th>التكلفة</th><th>الإلغاء المجاني حتى</th><th>آخر فحص</th></tr></thead><tbody>
+      ${d.watched.map(w => `<tr><td>${esc(w.ref)}</td><td>${esc(w.hotel)}</td><td>${esc(w.city)}</td><td>${shortDate(w.checkin)}</td><td>${money(w.cost)}</td><td>${dt(w.freeCancelUntil)}</td><td>${esc(w.lastWatch || '—')}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">لا توجد حجوزات قابلة للإلغاء المجاني حالياً.</p>'}</section>
+    <section class="card"><h2>السجل</h2>${d.history.length ? `<div class="tw"><table><thead><tr><th>التاريخ</th><th>رقم الحجز</th><th>الفندق</th><th>من</th><th>إلى</th><th>التوفير</th><th>نفّذها</th><th>الحالة</th></tr></thead><tbody>
+      ${d.history.map(h => `<tr><td>${esc(h.handled_at || '')}</td><td>${esc(h.ref)}</td><td>${esc(h.hotel_name)}</td><td>${esc(h.old_supplier || '')} ${h.old_locator ? `<span class="muted">(${esc(h.old_locator)})</span>` : ''}</td><td>${esc(h.supplier_name || '')} ${h.new_locator ? `<span class="muted">(${esc(h.new_locator)})</span>` : ''}</td><td>${h.status === 'dismissed' ? '—' : money(h.saving)}</td><td>${esc(h.handler || '')}</td>
+        <td>${h.status === 'done' ? '<span class="pill ok">تمت</span>' : h.status === 'dismissed' ? '<span class="pill">تم التجاهل</span>' : `<span class="pill bad">ألغِ القديم يدوياً</span>`}</td></tr>${h.status === 'cancel_failed' ? `<tr><td colspan="8" class="err" style="white-space:normal">${esc(h.note)}</td></tr>` : ''}`).join('')}</tbody></table></div>` : '<p class="muted">لا يوجد سجل بعد.</p>'}</section>`);
+  main.querySelector('#hs').onsubmit = async e => { e.preventDefault(); try { await api('/api/hunter/settings', { method: 'PUT', body: Object.fromEntries(new FormData(e.target)) }); toast('تم حفظ الإعدادات'); } catch (er) { toast(er.message); } };
+  main.querySelector('#run').onclick = async e => { busy(e.target, true); try { const r = await api('/api/hunter/run', { method: 'POST' }); toast(r.busy ? 'الفحص شغّال حالياً' : `تم فحص ${r.checked} حجز · ${r.found} فرصة`); viewHunter(); } catch (er) { toast(er.message); busy(e.target, false); } };
+  main.onclick = async e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.ds) { await api(`/api/hunter/${t.dataset.ds}/dismiss`, { method: 'POST' }); viewHunter(); }
+    if (t.dataset.rb) {
+      const o = d.opps.find(x => x.id === +t.dataset.rb);
+      modal(`<h2>إعادة حجز ${esc(o.ref)}</h2>
+        <div class="kv"><span>الفندق والغرفة</span><b>${esc(o.hotel_name)} · ${esc(o.room_name)}</b></div>
+        <div class="kv"><span>التكلفة الحالية (${esc(o.old_supplier || '')})</span><b>${money(o.old_cost)}</b></div>
+        <div class="kv"><span>التكلفة الجديدة (${esc(o.supplier_name)})</span><b>${money(o.new_cost)}</b></div>
+        <div class="kv"><span>التوفير</span><b style="color:var(--ok)">${money(o.saving)}</b></div>
+        <div class="kv"><span>سياسة الإلغاء الجديدة</span><b style="white-space:normal">${esc(o.new_cancel_policy || '')}</b></div>
+        <p class="muted">النظام يتأكد من السعر من جديد، ثم يحجز الغرفة الجديدة، ولما تتأكد يلغي الحجز القديم. إذا ما تأكد الجديد يبقى الحجز الحالي كما هو. سعر البيع للعميل لا يتغير.</p>
+        <div id="e"></div><div class="row"><button class="btn p" id="ok">تأكيد إعادة الحجز</button><button class="btn g" data-close>رجوع</button></div>`, (m, close) => {
+        m.querySelector('#ok').onclick = async ev => {
+          busy(ev.target, true);
+          try { const r = await api(`/api/hunter/${o.id}/rebook`, { method: 'POST' }); close();
+            toast(r.oldCancelled ? `تمت إعادة الحجز ${r.ref} · وفّرت ${money(r.saving)}` : `تم الحجز الجديد، لكن الحجز القديم لم يُلغَ. ألغه يدوياً لدى ${r.oldSupplier} (${r.oldLocator})`, 8000); viewHunter(); }
+          catch (er) { m.querySelector('#e').innerHTML = `<div class="err">${esc(er.message)}</div>`; busy(ev.target, false); }
+        };
+      });
+    }
   };
 }
 

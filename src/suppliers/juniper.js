@@ -65,7 +65,7 @@ module.exports = function juniperSupplier(sup) {
     const rules = arr(cp.PolicyRules?.Rule);
     const first = rules.find(r => +r['@FixedPrice'] > 0 || +r['@PercentPrice'] > 0 || +r['@Nights'] > 0);
     const date = (first?.['@DateFrom'] || first?.['@DateTo'] || '').slice(0, 10);
-    return { refundable: true, text: cp.Description || (date ? `إلغاء مجاني قبل ${date} (مع هامش أمان 12 ساعة)، بعدها تطبّق رسوم الإلغاء.` : 'يطبّق المورّد رسوم إلغاء حسب سياسته.') };
+    return { refundable: true, until: date ? (first?.['@DateFrom'] || first?.['@DateTo']) : null, text: cp.Description || (date ? `إلغاء مجاني قبل ${date} (مع هامش أمان 12 ساعة)، بعدها تطبّق رسوم الإلغاء.` : 'يطبّق المورّد رسوم إلغاء حسب سياسته.') };
   }
 
   return {
@@ -105,7 +105,7 @@ module.exports = function juniperSupplier(sup) {
           const c = cancelText(o.CancellationPolicy);
           return { optionId: `${sup.id}|${o['@RatePlanCode']}`, ratePlanCode: o['@RatePlanCode'],
             roomName: arr(o.HotelRooms?.HotelRoom).map(r => r.Name).join(' + '), board: o.Board?.['#text'] || o.Board || '',
-            refundable: c.refundable, cancelPolicy: c.text,
+            refundable: c.refundable, cancelPolicy: c.text, freeCancelUntil: c.until || null,
             cost: +(tf['@Nett'] || tf['@Gross'] || 0), currency: price['@Currency'] || 'EUR' };
         }),
       }));
@@ -122,7 +122,7 @@ module.exports = function juniperSupplier(sup) {
       return {
         bookingCode: opt.BookingCode?.['#text'] || opt.BookingCode, ratePlanCode: rate,
         cost: +(tf['@Nett'] || tf['@Gross'] || 0), currency: price['@Currency'] || 'EUR',
-        refundable: c.refundable, cancelPolicy: c.text,
+        refundable: c.refundable, cancelPolicy: c.text, freeCancelUntil: c.until || null,
         roomName: arr(opt.PriceInformation?.HotelRooms?.HotelRoom).map(r => r.Name).join(' + '),
         board: opt.PriceInformation?.Board?.['#text'] || '',
         // اسم الفندق وعنوانه وتصنيفه من رد Juniper نفسه (شرط الاعتماد)
